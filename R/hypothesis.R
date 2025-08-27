@@ -443,15 +443,28 @@ find_vars <- function(x, dot = TRUE, brackets = TRUE) {
 #' density_ratio(x, y, point = c(0, 1))
 #'
 #' @export
-density_ratio <- function(x, y = NULL, point = 0, ...) {
-  require_package("logspline")
+density_ratio <- function(x, y = NULL, point = 0, n = 4096, ...) {
   x <- as.numeric(x)
   point <- as.numeric(point)
+  dots <- list(...)
+  dots <- dots[names(dots) %in% names(formals("density.default"))]
+  dots$n <- n
 
   eval_density <- function(x, point) {
-    logspline_density <- logspline::logspline(x)
-    logspline::dlogspline(point, logspline_density)
+    # evaluate density of x at point
+    from <- min(x)
+    to <- max(x)
+    if (from > point) {
+      from <- point - sd(x) / 4
+    } else if (to < point) {
+      to <- point + sd(x) / 4
+    }
+    dens <- do_call(density, c(nlist(x, from, to), dots))
+    dens <- spline(dens$x, dens$y, xout = point)$y
+    # the spline may return negative values in extreme cases (#1816)
+    return(pmax(dens, 0))
   }
+
 
   out <- ulapply(point, eval_density, x = x)
   if (!is.null(y)) {
