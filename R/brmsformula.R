@@ -1347,10 +1347,15 @@ validate_formula.brmsformula <- function(
     # for easy access of baseline hazards
     out$family$bhaz <- extract_bhaz(out, data)
   }
+  if (is.mixfamily(out$family) && !is.null(data)) {
+    # group-level (over-group) mixtures store their grouping levels on the
+    # family so that observations are indexed consistently, also for newdata
+    out$family$mixgr <- extract_mix_groups(out, data)
+  }
   if (is.mixfamily(out$family)) {
     # every mixture family needs to know about additional response information
     for (i in seq_along(out$family$mix)) {
-      for (term in c("cats", "thres", "bhaz")) {
+      for (term in c("cats", "thres", "bhaz", "mixgr", "mixgr_var")) {
         out$family$mix[[i]][[term]] <- out$family[[term]]
       }
     }

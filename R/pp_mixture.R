@@ -87,11 +87,23 @@ pp_mixture.brmsfit <- function(x, newdata = NULL, re_formula = NULL,
   for (dp in names(prep$dpars)) {
     prep$dpars[[dp]] <- get_dpar(prep, dpar = dp)
   }
-  N <- choose_N(prep)
-  out <- lapply(seq_len(N), log_lik_mixture, prep = prep)
-  out <- abind(out, along = 3)
-  out <- aperm(out, c(1, 3, 2))
-  old_order <- prep$old_order
+  if (!is.null(prep$mixgr)) {
+    # group-level mixture: component responsibilities are defined per group
+    ps <- mixture_group_ps(prep)
+    ngroups <- dim(ps)[2]
+    out <- ps
+    for (g in seq_len(ngroups)) {
+      norm <- log_sum_exp_rows(ps[, g, , drop = FALSE])
+      out[, g, ] <- ps[, g, ] - norm
+    }
+    old_order <- NULL
+  } else {
+    N <- choose_N(prep)
+    out <- lapply(seq_len(N), log_lik_mixture, prep = prep)
+    out <- abind(out, along = 3)
+    out <- aperm(out, c(1, 3, 2))
+    old_order <- prep$old_order
+  }
   sort <- isTRUE(ncol(out) != length(old_order))
   out <- reorder_obs(out, old_order, sort = sort)
   if (!log) {

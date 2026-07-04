@@ -135,6 +135,12 @@ posterior_predict.brmsprep <- function(object, transform = NULL, sort = FALSE,
   }
   pp_fun <- paste0("posterior_predict_", object$family$fun)
   pp_fun <- get(pp_fun, asNamespace("brms"))
+  if (!is.null(object$mixgr)) {
+    # sample one mixture component per group (shared across its observations)
+    # before dispatching, so the assignment is consistent across observations
+    # (also under parallel execution)
+    object$mixgr$ids <- sample_mixture_group_ids(object)
+  }
   N <- choose_N(object)
   out <- plapply(seq_len(N), pp_fun, .cores = cores, prep = object, ...)
   if (grepl("_mv$", object$family$fun)) {
@@ -952,8 +958,14 @@ posterior_predict_custom <- function(i, prep, ...) {
 
 posterior_predict_mixture <- function(i, prep, ...) {
   families <- family_names(prep$family)
-  theta <- get_theta(prep, i = i)
-  smix <- sample_mixture_ids(theta)
+  if (!is.null(prep$mixgr)) {
+    # group-level mixture: reuse the component sampled for this observation's
+    # group (precomputed in posterior_predict.brmsprep)
+    smix <- prep$mixgr$ids[, prep$mixgr$J[i]]
+  } else {
+    theta <- get_theta(prep, i = i)
+    smix <- sample_mixture_ids(theta)
+  }
   out <- rep(NA, prep$ndraws)
   for (j in seq_along(families)) {
     draw_ids <- which(smix == j)
@@ -1041,6 +1053,23 @@ sample_mixture_ids <- function(theta) {
   ulapply(seq_rows(theta), function(s)
     sample(mix_comp, 1, prob = theta[s, ])
   )
+}
+
+# sample one mixture component id per group for group-level mixtures
+# the mixing proportions are constant within a group, hence sampling is based
+# on the group's representative observation
+# @param prep a 'brmsprep' object carrying a 'mixgr' list (J and ngroups)
+# @return a draws x ngroups matrix of sampled component ids
+sample_mixture_group_ids <- function(prep) {
+  J <- prep$mixgr$J
+  ngroups <- prep$mixgr$ngroups
+  ids <- matrix(NA_integer_, nrow = prep$ndraws, ncol = ngroups)
+  for (g in seq_len(ngroups)) {
+    # representative observation of group g (theta is constant within group)
+    i_rep <- match(g, J)
+    ids[, g] <- sample_mixture_ids(get_theta(prep, i = i_rep))
+  }
+  ids
 }
 
 # extract the first valid predicted value per Stan sample per observation

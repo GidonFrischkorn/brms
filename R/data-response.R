@@ -434,6 +434,40 @@ data_response.brmsframe <- function(x, data, check_response = TRUE,
     }
     c(out) <- vint
   }
+  if (has_mix_groups(x$family)) {
+    # group-level (over-group) mixture: the whole group belongs to one component
+    if (has_ad_terms(x, c("cens", "trunc", "weights"))) {
+      stop2("Group-level mixtures (via 'gr' in mixture()) are not supported ",
+            "in combination with 'cens', 'trunc', or 'weights'.")
+    }
+    groups <- get_mix_groups(x$family)
+    grmix <- eval2(get_mix_var(x$family), data)
+    grmix <- factor(grmix, levels = groups)
+    if (anyNA(grmix)) {
+      stop2("Grouping variable 'gr' in 'mix' contains levels ",
+            "not found in the original data.")
+    }
+    Jmix <- match(grmix, groups)
+    out$Ngrmix <- length(groups)
+    out$Jmix <- as.array(Jmix)
+    # predicted mixing proportions must be constant within each group
+    pred_theta <- any(dpar_class(names(x$dpars)) %in% "theta")
+    if (pred_theta) {
+      theta_dpars <- names(x$dpars)[dpar_class(names(x$dpars)) %in% "theta"]
+      theta_vars <- unique(ulapply(x$dpars[theta_dpars], function(p)
+        all_vars(p$allvars)))
+      for (v in theta_vars) {
+        vals <- eval2(v, data)
+        n_unique <- tapply(vals, Jmix, function(z) length(unique(z)))
+        if (any(n_unique > 1L)) {
+          stop2("Predicted mixing proportions ('theta') must be constant ",
+                "within each group defined by 'gr' in mixture().")
+        }
+      }
+      # one representative observation per group to read theta from
+      out$Jmixrep <- as.array(match(seq_len(out$Ngrmix), Jmix))
+    }
+  }
   if (length(out)) {
     resp <- usc(combine_prefix(x))
     out <- setNames(out, paste0(names(out), resp))
@@ -645,6 +679,25 @@ extract_thres_names <- function(x, data) {
     thres <- seq_len(nthres)
   }
   data.frame(thres, group, stringsAsFactors = FALSE)
+}
+
+# extract group levels of a group-level (over-group) mixture
+# the grouping variable is specified via the 'gr' argument of mixture()
+# @param x a brmsformula/brmsterms object or a family
+# @param data user specified data
+# @return a character vector of group levels, or NULL if 'gr' is not used
+extract_mix_groups <- function(x, data) {
+  family <- if (is.family(x)) x else x$family
+  gr <- get_mix_var(family)
+  if (is.null(gr)) {
+    return(NULL)
+  }
+  grmix <- eval2(gr, data)
+  if (is.null(grmix) || !length(grmix)) {
+    stop2("The grouping variable '", gr, "' of a mixture was not ",
+          "found in the data.")
+  }
+  levels(factor(grmix))
 }
 
 # extract number of thresholds from the response values

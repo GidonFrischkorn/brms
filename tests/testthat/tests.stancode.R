@@ -1897,6 +1897,53 @@ test_that("Stan code of mixture model is correct", {
   expect_match2(scode, "mu2[n] = (log(nlp_eta[n]) + nlp_a[n]);")
 })
 
+test_that("Stan code of group-level mixture model is correct", {
+  data <- data.frame(y = 1:10, x = rnorm(10), g = rep(1:5, each = 2))
+
+  # estimated (joint) mixing proportions
+  scode <- stancode(
+    bf(y ~ x, sigma2 ~ x), data,
+    family = mixture(gaussian, gaussian, gr = "g")
+  )
+  expect_match2(scode, "int<lower=1> Ngrmix;  // number of mixture groups")
+  expect_match2(scode, "array[N] int<lower=1> Jmix;")
+  expect_match2(scode, "matrix[Ngrmix, 2] Lmix = rep_matrix(0.0, Ngrmix, 2);")
+  expect_match2(scode, "Lmix[Jmix[n], 1] += normal_lpdf(Y[n] | mu1[n], sigma1);")
+  expect_match2(scode, "Lmix[Jmix[n], 2] += normal_lpdf(Y[n] | mu2[n], sigma2[n]);")
+  expect_match2(scode, "for (j in 1:Ngrmix) {")
+  expect_match2(scode, "ps[1] = log(theta1) + Lmix[j, 1];")
+  expect_match2(scode, "ps[2] = log(theta2) + Lmix[j, 2];")
+  expect_match2(scode, "target += log_sum_exp(ps);")
+
+  # predicted mixing proportions that are constant within each group
+  data$gc <- factor(rep(c("a", "b"), each = 5))
+  scode <- stancode(
+    bf(y ~ x, theta1 ~ gc), data,
+    family = mixture(gaussian, gaussian, gr = "g")
+  )
+  expect_match2(scode, "array[Ngrmix] int<lower=1> Jmixrep;")
+  expect_match2(scode, "ps[1] = theta1[Jmixrep[j]] + Lmix[j, 1];")
+
+  # predicted proportions varying within group are not allowed
+  expect_error(
+    standata(bf(y ~ x, theta1 ~ x), data,
+             family = mixture(gaussian, gaussian, gr = "g")),
+    "must be constant within each group"
+  )
+  # threading is not supported for group-level mixtures
+  expect_error(
+    stancode(bf(y ~ x), data, family = mixture(gaussian, gaussian, gr = "g"),
+             threads = threading(2)),
+    "Threading is not supported"
+  )
+  # censoring/truncation/weights are not supported
+  expect_error(
+    standata(bf(y | trunc(0) ~ x), data,
+             family = mixture(gaussian, gaussian, gr = "g")),
+    "not supported in combination with"
+  )
+})
+
 test_that("sparse matrix multiplication is applied correctly", {
   data <- data.frame(y = rnorm(10), x = rnorm(10))
 

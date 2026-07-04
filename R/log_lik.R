@@ -123,6 +123,11 @@ log_lik.brmsprep <- function(object, cores = NULL, ...) {
   for (dp in names(object$dpars)) {
     object$dpars[[dp]] <- get_dpar(object, dpar = dp)
   }
+  if (!is.null(object$mixgr)) {
+    # group-level (over-group) mixture: the likelihood factorizes over groups
+    # rather than observations, hence return one column per group
+    return(log_lik_mixture_grouped(object))
+  }
   N <- choose_N(object)
   out <- plapply(seq_len(N), log_lik_fun, .cores = cores, prep = object)
   out <- do_call(cbind, out)
@@ -994,6 +999,54 @@ log_lik_mixture <- function(i, prep) {
     out <- log(rowSums(out))
   }
   log_lik_weight(out, i = i, prep = prep)
+}
+
+# per-group, per-component log-weights of a group-level mixture
+# computes log(theta_k^g) + sum_{i in group g} log f_k(y_i)
+# @return a draws x ngroups x components array
+mixture_group_ps <- function(prep) {
+  families <- family_names(prep$family)
+  J <- prep$mixgr$J
+  ngroups <- prep$mixgr$ngroups
+  ndraws <- prep$ndraws
+  nmix <- length(families)
+  # accumulate each component's per-observation log density within its group
+  ps <- array(0, dim = c(ndraws, ngroups, nmix))
+  for (k in seq_len(nmix)) {
+    log_lik_fun <- get(paste0("log_lik_", families[k]), asNamespace("brms"))
+    tmp_prep <- pseudo_prep_for_mixture(prep, k)
+    for (i in seq_len(prep$nobs)) {
+      ps[, J[i], k] <- ps[, J[i], k] + log_lik_fun(i, tmp_prep)
+    }
+  }
+  # add the (group-constant) log mixing weights
+  for (g in seq_len(ngroups)) {
+    i_rep <- match(g, J)
+    ps[, g, ] <- ps[, g, ] + log(get_theta(prep, i = i_rep))
+  }
+  ps
+}
+
+# log-likelihood of a group-level (over-group) mixture model
+# the mixture is marginalized once per group, hence one column per group is
+# returned, enabling leave-one-group-out cross-validation via loo/waic
+# @return a draws x ngroups matrix
+log_lik_mixture_grouped <- function(prep) {
+  ps <- mixture_group_ps(prep)
+  ngroups <- dim(ps)[2]
+  out <- matrix(NA_real_, nrow = dim(ps)[1], ncol = ngroups)
+  for (g in seq_len(ngroups)) {
+    out[, g] <- log_sum_exp_rows(ps[, g, , drop = FALSE])
+  }
+  out
+}
+
+# stable row-wise log(sum(exp(.))) over the last dimension of a
+# draws x 1 x components slice; returns a draws-length vector
+log_sum_exp_rows <- function(x) {
+  x <- matrix(x, nrow = dim(x)[1])
+  mx <- apply(x, 1, max)
+  mx + log(rowSums(exp(x - mx)))
 }
 
 # ----------- log_lik helper-functions -----------

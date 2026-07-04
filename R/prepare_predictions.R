@@ -153,6 +153,13 @@ prepare_predictions.brmsframe <- function(x, draws, sdata, ...) {
         out$dpars$theta <- data2draws(out$dpars$theta, dim = dim)
       }
     }
+    if (has_mix_groups(x$family)) {
+      # group-level (over-group) mixture: the whole group shares one component
+      out$mixgr <- list(
+        J = as.integer(sdata[[paste0("Jmix", resp)]]),
+        ngroups = as.integer(sdata[[paste0("Ngrmix", resp)]])
+      )
+    }
   }
   if (is_ordinal(x$family)) {
     # it is better to handle ordinal thresholds outside the

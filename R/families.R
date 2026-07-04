@@ -476,7 +476,7 @@ combine_family_info <- function(x, y, ...) {
     clb <- !any(ulapply(x[, 1], isFALSE))
     cub <- !any(ulapply(x[, 2], isFALSE))
     x <- c(clb, cub)
-  } else if (y %in% c("thres", "bhaz")) {
+  } else if (y %in% c("thres", "bhaz", "mixgr", "mixgr_var")) {
     # same across mixture components
     x <- x[[1]]
   }
@@ -891,6 +891,14 @@ acat <- function(link = "logit", link_disc = "log",
 #'   models. As the resulting model is only weakly identified, informative
 #'   priors on the \code{theta} parameters are strongly recommended (see the
 #'   examples in \code{\link{brmsformula}}).
+#' @param gr Optional name (as a character string) of a grouping variable in the
+#'   data. If specified, the mixture is computed over the levels of that variable
+#'   rather than over individual observations, that is, all observations that
+#'   belong to the same group are assumed to stem from the same (unknown) mixture
+#'   component. This is useful, for example, when entire participants (rather than
+#'   single trials) are thought to belong to different latent classes. By default
+#'   (\code{NA}), the mixture is computed at the observation level as usual. See
+#'   Details for restrictions of group-level mixtures.
 #'
 #' @return An object of class \code{mixfamily}.
 #'
@@ -912,6 +920,20 @@ acat <- function(link = "logit", link_disc = "log",
 #' population-level intercepts via \code{\link{set_prior}} to improve
 #' posterior inference. In addition, it is sometimes necessary to set \code{init = 0}
 #' in the call to \code{\link{brm}} to allow chains to initialize properly.
+#'
+#' By default, the mixture is computed at the level of individual observations,
+#' that is, each observation may stem from a different mixture component. Via
+#' argument \code{gr}, the mixture can instead be computed over the levels of a
+#' grouping variable so that all observations within a group share the same
+#' (unknown) component. This yields a different likelihood in which the mixing
+#' is marginalized once per group rather than once per observation. Group-level
+#' mixtures currently require the mixing proportions to be either estimated,
+#' fixed, or predicted by covariates that are constant within each group. They
+#' are not supported in combination with within-chain threading, censoring,
+#' truncation, or observation weights. For group-level mixtures, \code{log_lik},
+#' \code{loo}, and \code{waic} are computed per group (i.e. leave-one-group-out
+#' cross-validation), and the refinements \code{reloo}, \code{loo_moment_match},
+#' and \code{loo_subsample} are not available.
 #'
 #' For more details on the specification of mixture
 #' models, see \code{\link{brmsformula}}.
@@ -969,10 +991,17 @@ acat <- function(link = "logit", link_disc = "log",
 #'
 #' ## compare model fit
 #' loo(fit1, fit2, fit3, fit4)
+#'
+#' ## group-level mixture: whole groups belong to the same component
+#' dat$g <- rep(1:60, each = 5)
+#' fit6 <- brm(bf(y ~ 1), dat, family = mixture(gaussian, gaussian, gr = "g"),
+#'             prior = prior, init = 0, chains = 2)
+#' summary(fit6)
 #' }
 #'
 #' @export
-mixture <- function(..., flist = NULL, nmix = 1, order = NULL, refcat = NULL) {
+mixture <- function(..., flist = NULL, nmix = 1, order = NULL, refcat = NULL,
+                    gr = NA) {
   dots <- c(list(...), flist)
   if (length(nmix) == 1L) {
     nmix <- rep(nmix, length(dots))
@@ -984,12 +1013,16 @@ mixture <- function(..., flist = NULL, nmix = 1, order = NULL, refcat = NULL) {
   if (!is.null(refcat) && !isNA(refcat)) {
     stop2("For mixture models, 'refcat' can only be NA.")
   }
+  # optional grouping variable for group-level (over-group) mixtures
+  gr <- as_one_character(gr, allow_na = TRUE)
+  mixgr_var <- if (!isNA(gr)) gr else NULL
   dots <- dots[rep(seq_along(dots), nmix)]
   family <- list(
     family = "mixture",
     link = "identity",
     mix = lapply(dots, validate_family),
-    refcat = refcat
+    refcat = refcat,
+    mixgr_var = mixgr_var
   )
   class(family) <- c("mixfamily", "brmsfamily", "family")
   # validity checks
@@ -1851,6 +1884,24 @@ no_nu <- function(bterms) {
 # get mixture index if specified
 get_mix_id <- function(family) {
   family_info(family, "mix") %||% ""
+}
+
+# get the grouping variable name of a group-level (over-group) mixture
+get_mix_var <- function(family) {
+  # prefer the top-level field (available before it is copied to components)
+  out <- if (is.list(family)) family[["mixgr_var"]]
+  out %||% family_info(family, "mixgr_var")
+}
+
+# get group levels of a group-level (over-group) mixture (set once data is seen)
+get_mix_groups <- function(family) {
+  out <- if (is.list(family)) family[["mixgr"]]
+  out %||% family_info(family, "mixgr")
+}
+
+# is the mixture computed over a grouping variable rather than observations?
+has_mix_groups <- function(family) {
+  length(get_mix_var(family)) > 0L
 }
 
 # does the family-link combination have a built-in Stan function?
