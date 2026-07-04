@@ -101,6 +101,10 @@ test_that("mixture returns expected results and errors", {
                "Expecting at least 2 mixture components")
   expect_error(mixture(poisson, binomial, order = "x"),
                "Argument 'order' is invalid")
+  expect_true(is.na(mixture(gaussian, gaussian, refcat = NA)$refcat))
+  expect_null(mixture(gaussian, gaussian)$refcat)
+  expect_error(mixture(gaussian, gaussian, refcat = 1),
+               "'refcat' can only be NA")
 })
 
 test_that("response interval is defined correctly", {
