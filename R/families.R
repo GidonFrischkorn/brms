@@ -1011,7 +1011,7 @@ mixture <- function(..., flist = NULL, nmix = 1, order = NULL, refcat = NULL,
           "as the number of mixture components.")
   }
   if (!is.null(refcat) && !isNA(refcat)) {
-    stop2("For mixture models, 'refcat' can only be NA.")
+    stop2("For mixture models, 'refcat' can only be NULL or NA.")
   }
   # optional grouping variable for group-level (over-group) mixtures
   gr <- as_one_character(gr, allow_na = TRUE)
