@@ -104,7 +104,7 @@ test_that("mixture returns expected results and errors", {
   expect_true(is.na(mixture(gaussian, gaussian, refcat = NA)$refcat))
   expect_null(mixture(gaussian, gaussian)$refcat)
   expect_error(mixture(gaussian, gaussian, refcat = 1),
-               "'refcat' can only be NA")
+               "'refcat' can only be NULL or NA")
 })
 
 test_that("response interval is defined correctly", {
@@ -125,3 +125,4 @@ test_that("default priors are as expected", {
 test_that("correct STAN code is used", {
     expect_equal(xbeta()$include, "fun_xbeta.stan")
 })
+
