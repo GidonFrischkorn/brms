@@ -1858,7 +1858,7 @@ test_that("Stan code of mixture model is correct", {
   )
   expect_error(
     mixture(gaussian, gaussian, refcat = 2),
-    "'refcat' can only be NA"
+    "'refcat' can only be NULL or NA"
   )
 
   fam <- mixture(cumulative, sratio)
