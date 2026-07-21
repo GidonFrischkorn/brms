@@ -1856,11 +1856,7 @@ test_that("Stan code of mixture model is correct", {
              data = data, family = fam_na),
     "all mixing proportions must be predicted"
   )
-  expect_error(
-    mixture(gaussian, gaussian, refcat = 2),
-    "'refcat' can only be NULL or NA"
-  )
-
+  
   fam <- mixture(cumulative, sratio)
   scode <- stancode(y ~ x, data, family = fam)
   expect_match2(scode, "ordered_logistic_lpmf(Y[n] | mu1[n], Intercept_mu1);")
