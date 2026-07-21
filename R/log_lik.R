@@ -1021,8 +1021,7 @@ mixture_group_ps <- function(prep) {
   }
   # add the (group-constant) log mixing weights
   for (g in seq_len(ngroups)) {
-    i_rep <- match(g, J)
-    ps[, g, ] <- ps[, g, ] + log(get_theta(prep, i = i_rep))
+    ps[, g, ] <- ps[, g, ] + log(get_theta(prep, i = prep$mixgr$rep[g]))
   }
   ps
 }
@@ -1039,14 +1038,6 @@ log_lik_mixture_grouped <- function(prep) {
     out[, g] <- log_sum_exp_rows(ps[, g, , drop = FALSE])
   }
   out
-}
-
-# stable row-wise log(sum(exp(.))) over the last dimension of a
-# draws x 1 x components slice; returns a draws-length vector
-log_sum_exp_rows <- function(x) {
-  x <- matrix(x, nrow = dim(x)[1])
-  mx <- apply(x, 1, max)
-  mx + log(rowSums(exp(x - mx)))
 }
 
 # ----------- log_lik helper-functions -----------

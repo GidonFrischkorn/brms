@@ -791,6 +791,12 @@ test_that("standata includes data for group-level mixture models", {
   form <- bf(y ~ x, family = mixture(gaussian, gaussian, gr = "gi"))
   sdata <- standata(form, data)
   expect_equal(sdata$Jmix, as.array(rep(1:2, each = 5)))
+
+  # group indices are defined by the data at hand (e.g. for newdata subsets)
+  form <- bf(y ~ x, family = mixture(gaussian, gaussian, gr = "g"))
+  sdata <- standata(form, data[data$g == "b", ])
+  expect_equal(sdata$Ngrmix, 1)
+  expect_equal(sdata$Jmix, as.array(rep(1, 5)))
 })
 
 test_that("standata includes data for Gaussian processes", {

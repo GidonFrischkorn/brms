@@ -1924,6 +1924,13 @@ test_that("Stan code of group-level mixture model is correct", {
   expect_match2(scode, "array[Ngrmix] int<lower=1> Jmixrep;")
   expect_match2(scode, "ps[1] = theta1[Jmixrep[j]] + Lmix[j, 1];")
 
+  # discrete component families use the normalized lpmf
+  scode <- stancode(
+    bf(y ~ x), data,
+    family = mixture(poisson, poisson, gr = "g")
+  )
+  expect_match2(scode, "Lmix[Jmix[n], 1] += poisson_log_lpmf(Y[n] | mu1[n]);")
+
   # predicted proportions varying within group are not allowed
   expect_error(
     standata(bf(y ~ x, theta1 ~ x), data,
@@ -1941,6 +1948,12 @@ test_that("Stan code of group-level mixture model is correct", {
     standata(bf(y | trunc(0) ~ x), data,
              family = mixture(gaussian, gaussian, gr = "g")),
     "not supported in combination with"
+  )
+  # group-level mixtures are not yet supported in multivariate models
+  expect_error(
+    stancode(bf(y ~ x) + bf(x ~ 1, family = gaussian()), data,
+             family = mixture(gaussian, gaussian, gr = "g")),
+    "not yet supported in multivariate models"
   )
 })
 

@@ -237,11 +237,12 @@ stan_log_lik_mix <- function(ll, bterms, pred_mix_prob, threads,
   if (has_mix_groups(bterms$family)) {
     # group-level (over-group) mixture: accumulate this component's log
     # density into a per-group vector; the mixing weight is added later,
-    # once per group. Always use the normalized lpdf because normalization
-    # constants do not factor out of the group-level log_sum_exp.
+    # once per group. Always use the normalized lpdf/lpmf because
+    # normalization constants do not factor out of the group-level log_sum_exp.
+    lpdf <- stan_log_lik_lpdf_name(bterms, normalize = TRUE)
     return(glue(
       "Lmix{resp}[Jmix{resp}{n}, {mix}] += ",
-      "{ll$dist}_lpdf({Y}{resp}{n}{ll$shift} | {ll$args});\n"
+      "{ll$dist}_{lpdf}({Y}{resp}{n}{ll$shift} | {ll$args});\n"
     ))
   }
   theta <- str_if(pred_mix_prob,
@@ -1356,7 +1357,7 @@ use_glm_primitive <- function(bterms) {
   # the model can only have a single predicted parameter
   # and no additional residual or autocorrelation structure
   mu <- bterms$dpars[["mu"]]
-  non_glm_adterms <- c("se", "weights", "thres", "cens", "trunc", "rate", "mix")
+  non_glm_adterms <- c("se", "weights", "thres", "cens", "trunc", "rate")
   if (!is.btl(mu) || length(bterms$dpars) > 1L ||
       isTRUE(bterms$rescor) || is.formula(mu$ac) ||
       has_ad_terms(bterms, non_glm_adterms)) {

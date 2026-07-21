@@ -1347,15 +1347,10 @@ validate_formula.brmsformula <- function(
     # for easy access of baseline hazards
     out$family$bhaz <- extract_bhaz(out, data)
   }
-  if (is.mixfamily(out$family) && !is.null(data)) {
-    # group-level (over-group) mixtures store their grouping levels on the
-    # family so that observations are indexed consistently, also for newdata
-    out$family$mixgr <- extract_mix_groups(out, data)
-  }
   if (is.mixfamily(out$family)) {
     # every mixture family needs to know about additional response information
     for (i in seq_along(out$family$mix)) {
-      for (term in c("cats", "thres", "bhaz", "mixgr", "mixgr_var")) {
+      for (term in c("cats", "thres", "bhaz", "mixgr_var")) {
         out$family$mix[[i]][[term]] <- out$family[[term]]
       }
     }
@@ -1426,6 +1421,10 @@ validate_formula.mvbrmsformula <- function(
   }
   if (length(formula$forms) < 2L) {
     stop2("Multivariate models require at least two responses.")
+  }
+  if (any(ulapply(formula$forms, function(f) has_mix_groups(f$family)))) {
+    stop2("Group-level mixtures (via 'gr' in mixture()) are not yet ",
+          "supported in multivariate models.")
   }
   allow_rescor <- allow_rescor(formula)
   if (is.null(formula$rescor)) {

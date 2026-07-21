@@ -252,14 +252,14 @@ test_that("group-level mixture models work correctly", suppressWarnings({
   # loo refinements are not available for group-level mixtures
   expect_error(reloo(fit, loo(fit)), "not supported for group-level")
   expect_error(loo_subsample(fit), "not supported for group-level")
-  # the marginal expectation matches an observation-level mixture
-  fit_obs <- brm(
-    bf(y ~ 1), data = dat, family = mixture(gaussian, gaussian),
-    prior = c(prior(normal(0, 5), Intercept, dpar = mu1),
-              prior(normal(6, 5), Intercept, dpar = mu2)),
-    chains = 1, init = 0, refresh = 0, seed = 1234
+  # newdata may contain a subset of the original groups
+  nd <- dat[dat$g %in% c("1", "2"), ]
+  expect_equal(ncol(log_lik(fit, newdata = nd)), 2)
+  expect_equal(
+    dim(posterior_predict(fit, newdata = nd)),
+    c(ndraws(fit), nrow(nd))
   )
-  expect_equal(dim(posterior_epred(fit_obs)), c(ndraws(fit_obs), nobs(fit_obs)))
+  expect_equal(dim(pp_mixture(fit, newdata = nd)), c(2, 4, 2))
 }))
 
 test_that("Gaussian processes work correctly", suppressWarnings({

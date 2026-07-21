@@ -1058,16 +1058,13 @@ sample_mixture_ids <- function(theta) {
 # sample one mixture component id per group for group-level mixtures
 # the mixing proportions are constant within a group, hence sampling is based
 # on the group's representative observation
-# @param prep a 'brmsprep' object carrying a 'mixgr' list (J and ngroups)
+# @param prep a 'brmsprep' object carrying a 'mixgr' list
 # @return a draws x ngroups matrix of sampled component ids
 sample_mixture_group_ids <- function(prep) {
-  J <- prep$mixgr$J
   ngroups <- prep$mixgr$ngroups
   ids <- matrix(NA_integer_, nrow = prep$ndraws, ncol = ngroups)
   for (g in seq_len(ngroups)) {
-    # representative observation of group g (theta is constant within group)
-    i_rep <- match(g, J)
-    ids[, g] <- sample_mixture_ids(get_theta(prep, i = i_rep))
+    ids[, g] <- sample_mixture_ids(get_theta(prep, i = prep$mixgr$rep[g]))
   }
   ids
 }

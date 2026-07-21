@@ -4,7 +4,7 @@
 \alias{mixture}
 \title{Finite Mixture Families in \pkg{brms}}
 \usage{
-mixture(..., flist = NULL, nmix = 1, order = NULL, refcat = NULL, gr = NA)
+mixture(..., flist = NULL, nmix = 1, order = NULL, refcat = NULL, gr = NULL)
 }
 \arguments{
 \item{...}{One or more objects providing a description of the
@@ -46,8 +46,8 @@ rather than over individual observations, that is, all observations that
 belong to the same group are assumed to stem from the same (unknown) mixture
 component. This is useful, for example, when entire participants (rather than
 single trials) are thought to belong to different latent classes. By default
-(\code{NA}), the mixture is computed at the observation level as usual. See
-Details for restrictions of group-level mixtures.}
+(\code{NULL}), the mixture is computed at the observation level as usual.
+See Details for restrictions of group-level mixtures.}
 }
 \value{
 An object of class \code{mixfamily}.
@@ -82,10 +82,13 @@ is marginalized once per group rather than once per observation. Group-level
 mixtures currently require the mixing proportions to be either estimated,
 fixed, or predicted by covariates that are constant within each group. They
 are not supported in combination with within-chain threading, censoring,
-truncation, or observation weights. For group-level mixtures, \code{log_lik},
-\code{loo}, and \code{waic} are computed per group (i.e. leave-one-group-out
-cross-validation), and the refinements \code{reloo}, \code{loo_moment_match},
-and \code{loo_subsample} are not available.
+truncation, observation weights, or multivariate models. For group-level
+mixtures, \code{log_lik}, \code{loo}, and \code{waic} are computed per group
+(i.e. leave-one-group-out cross-validation), and the refinements
+\code{reloo}, \code{loo_moment_match}, and \code{loo_subsample} are not
+available. When predicting from new data, the groups are defined by the
+grouping variable within that data set and need not match the groups of the
+original data.
 
 For more details on the specification of mixture
 models, see \code{\link{brmsformula}}.
